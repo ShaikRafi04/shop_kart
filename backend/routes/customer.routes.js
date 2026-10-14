@@ -4,7 +4,8 @@ const {
     registerCustomer,
     loginCustomer,
     getMyProfile,
-    logoutCustomer
+    logoutCustomer,
+    changePassword
 } = require("../controllers/customer.controller");
 
 const authMiddleware = require("../middlewares/auth.middleware");
@@ -24,8 +25,12 @@ router.post("/login", loginCustomer);
 router.get("/me", authMiddleware, getMyProfile);
 
 
-// Logout
+// Logout - Protected
 router.post("/logout", authMiddleware, logoutCustomer);
+
+
+// Change Password - Protected (Bonus Challenge)
+router.patch("/change-password", authMiddleware, changePassword);
 
 
 module.exports = router;

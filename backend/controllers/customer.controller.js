@@ -6,10 +6,18 @@ const generateToken = require("../utils/generateToken");
 // REGISTER
 const registerCustomer = async (req, res) => {
     try {
-        const { fullName, email, password, phone } = req.body;
+        const { fullName, email, password, phone } = req.body || {};
 
         // Check required fields
-        if (!fullName || !email || !password || !phone) {
+        if (
+            !fullName ||
+            !email ||
+            !password ||
+            !phone ||
+            !String(fullName).trim() ||
+            !String(email).trim() ||
+            !String(phone).trim()
+        ) {
             return res.status(400).json({
                 success: false,
                 message: "All fields are required"
@@ -17,15 +25,17 @@ const registerCustomer = async (req, res) => {
         }
 
         // Check password length
-        if (password.length < 6) {
+        if (String(password).length < 6) {
             return res.status(400).json({
                 success: false,
                 message: "Password must contain at least 6 characters"
             });
         }
 
+        const normalizedEmail = String(email).trim().toLowerCase();
+
         // Check if email already exists
-        const existingCustomer = await Customer.findOne({ email });
+        const existingCustomer = await Customer.findOne({ email: normalizedEmail });
 
         if (existingCustomer) {
             return res.status(409).json({
@@ -39,10 +49,10 @@ const registerCustomer = async (req, res) => {
 
         // Create customer
         const customer = await Customer.create({
-            fullName,
-            email,
+            fullName: String(fullName).trim(),
+            email: normalizedEmail,
             password: hashedPassword,
-            phone
+            phone: String(phone).trim()
         });
 
         // Send response without password
@@ -58,6 +68,12 @@ const registerCustomer = async (req, res) => {
         });
 
     } catch (error) {
+        if (error.code === 11000) {
+            return res.status(409).json({
+                success: false,
+                message: "Email already exists"
+            });
+        }
         return res.status(500).json({
             success: false,
             message: "Server error"
@@ -69,7 +85,7 @@ const registerCustomer = async (req, res) => {
 // LOGIN
 const loginCustomer = async (req, res) => {
     try {
-        const { email, password } = req.body;
+        const { email, password } = req.body || {};
 
         // Check required fields
         if (!email || !password) {
@@ -79,8 +95,10 @@ const loginCustomer = async (req, res) => {
             });
         }
 
+        const normalizedEmail = String(email).trim().toLowerCase();
+
         // Find customer
-        const customer = await Customer.findOne({ email });
+        const customer = await Customer.findOne({ email: normalizedEmail });
 
         if (!customer) {
             return res.status(401).json({
@@ -108,7 +126,7 @@ const loginCustomer = async (req, res) => {
         // Store JWT in HttpOnly cookie
         res.cookie("token", token, {
             httpOnly: true,
-            secure: false,
+            secure: process.env.NODE_ENV === "production",
             sameSite: "lax",
             maxAge: 24 * 60 * 60 * 1000
         });
@@ -155,7 +173,11 @@ const getMyProfile = async (req, res) => {
 // LOGOUT
 const logoutCustomer = async (req, res) => {
     try {
-        res.clearCookie("token");
+        res.clearCookie("token", {
+            httpOnly: true,
+            sameSite: "lax",
+            secure: process.env.NODE_ENV === "production"
+        });
 
         return res.status(200).json({
             success: true,
@@ -171,9 +193,69 @@ const logoutCustomer = async (req, res) => {
 };
 
 
+// BONUS: CHANGE PASSWORD
+const changePassword = async (req, res) => {
+    try {
+        const { oldPassword, currentPassword, newPassword } = req.body || {};
+        const previousPassword = oldPassword || currentPassword;
+
+        if (!previousPassword || !newPassword) {
+            return res.status(400).json({
+                success: false,
+                message: "Old password and new password are required"
+            });
+        }
+
+        if (String(newPassword).length < 6) {
+            return res.status(400).json({
+                success: false,
+                message: "Password must contain at least 6 characters"
+            });
+        }
+
+        // Fetch user with password
+        const customer = await Customer.findById(req.user._id);
+
+        if (!customer) {
+            return res.status(404).json({
+                success: false,
+                message: "Customer not found"
+            });
+        }
+
+        // Verify old password
+        const isMatch = await bcrypt.compare(previousPassword, customer.password);
+
+        if (!isMatch) {
+            return res.status(400).json({
+                success: false,
+                message: "Incorrect old password"
+            });
+        }
+
+        // Hash new password
+        const hashedPassword = await bcrypt.hash(newPassword, 10);
+        customer.password = hashedPassword;
+        await customer.save();
+
+        return res.status(200).json({
+            success: true,
+            message: "Password changed successfully"
+        });
+
+    } catch (error) {
+        return res.status(500).json({
+            success: false,
+            message: "Server error"
+        });
+    }
+};
+
+
 module.exports = {
     registerCustomer,
     loginCustomer,
     getMyProfile,
-    logoutCustomer
+    logoutCustomer,
+    changePassword
 };

@@ -3,7 +3,12 @@ const Customer = require("../models/customer.model");
 
 const authMiddleware = async (req, res, next) => {
     try {
-        const token = req.cookies.token;
+        let token = req.cookies?.token;
+
+        // Fallback to Authorization header if cookie is absent (helps with versatile API testing)
+        if (!token && req.headers?.authorization?.startsWith("Bearer ")) {
+            token = req.headers.authorization.split(" ")[1];
+        }
 
         if (!token) {
             return res.status(401).json({
