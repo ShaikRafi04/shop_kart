@@ -92,6 +92,12 @@ export const CartProvider = ({ children, user }) => {
     }
   };
 
+  // Action: Clear cart after successful order payment
+  const clearCart = () => {
+    setCart([]);
+    setError("");
+  };
+
   // Derived Values (Section 15)
   const totalUnits = useMemo(() => {
     return cart.reduce((sum, item) => sum + (item.quantity || 0), 0);
@@ -118,6 +124,7 @@ export const CartProvider = ({ children, user }) => {
         addToCart,
         updateQuantity,
         removeFromCart,
+        clearCart,
         fetchCart
       }}
     >

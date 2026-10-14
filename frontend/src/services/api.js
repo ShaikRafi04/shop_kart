@@ -105,4 +105,35 @@ export const removeFromCart = async (productId) => {
   return response.data;
 };
 
+// Checkout & Order APIs (Lab 06)
+export const createPaymentOrder = async (shippingAddress) => {
+  const response = await api.post("/orders/create-payment-order", { shippingAddress });
+  return response.data;
+};
+
+export const verifyPayment = async (paymentData) => {
+  const response = await api.post("/orders/verify-payment", paymentData);
+  return response.data;
+};
+
+export const getMyOrders = async () => {
+  const response = await api.get("/orders");
+  return response.data;
+};
+
+export const getOrderById = async (orderId) => {
+  const response = await api.get(`/orders/${orderId}`);
+  return response.data;
+};
+
+export const updateOrderStatus = async (orderId, status) => {
+  const response = await api.patch(`/orders/${orderId}/status`, { status });
+  return response.data;
+};
+
+export const getTestSignature = async (razorpayOrderId, razorpayPaymentId) => {
+  const response = await api.post("/orders/test-signature", { razorpayOrderId, razorpayPaymentId });
+  return response.data;
+};
+
 export default api;

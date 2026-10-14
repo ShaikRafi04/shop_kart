@@ -273,9 +273,7 @@ const Cart = () => {
           {/* Proceed to Checkout CTA */}
           <button
             id="proceed-to-checkout-btn"
-            onClick={() => {
-              alert("Ready for Lab 06: Checkout & Order Creation Flow!");
-            }}
+            onClick={() => navigate("/checkout")}
             className="btn-primary"
             style={{
               width: "100%",

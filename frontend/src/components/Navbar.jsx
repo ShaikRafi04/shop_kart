@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
-import { ShoppingBag, LogOut, User, LogIn, UserPlus, Grid, Heart, ShoppingCart } from "lucide-react";
+import { ShoppingBag, LogOut, User, LogIn, UserPlus, Grid, Heart, ShoppingCart, Package } from "lucide-react";
 import { logoutCustomer, getWishlist } from "../services/api";
 import { useCart } from "../context/CartContext";
 
@@ -180,6 +180,28 @@ const Navbar = ({ user, setUser }) => {
 
           {user ? (
             <>
+              {/* My Orders Link (Lab 06) */}
+              <Link
+                id="nav-orders-link"
+                to="/orders"
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "0.45rem",
+                  textDecoration: "none",
+                  color: location.pathname.startsWith("/orders") ? "#818cf8" : "var(--text-muted)",
+                  fontSize: "0.9rem",
+                  fontWeight: 600,
+                  padding: "0.45rem 0.8rem",
+                  borderRadius: "8px",
+                  background: location.pathname.startsWith("/orders") ? "rgba(99, 102, 241, 0.15)" : "transparent",
+                  transition: "all 0.2s",
+                }}
+              >
+                <Package size={16} color={location.pathname.startsWith("/orders") ? "#818cf8" : "var(--text-muted)"} />
+                <span>Orders</span>
+              </Link>
+
               {/* Home / Profile Link */}
               <Link
                 id="nav-profile-link"

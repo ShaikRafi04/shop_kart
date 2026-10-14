@@ -8,6 +8,9 @@ import Products from "./pages/Products";
 import ProductDetails from "./pages/ProductDetails";
 import Wishlist from "./pages/Wishlist";
 import Cart from "./pages/Cart";
+import Checkout from "./pages/Checkout";
+import Orders from "./pages/Orders";
+import OrderDetails from "./pages/OrderDetails";
 import { CartProvider } from "./context/CartContext";
 import { getMyProfile } from "./services/api";
 
@@ -70,6 +73,12 @@ function App() {
 
               {/* Shopping Cart Route (Lab 05) */}
               <Route path="/cart" element={<Cart />} />
+
+              {/* Checkout & Orders Routes (Lab 06) */}
+              <Route path="/checkout" element={<Checkout />} />
+              <Route path="/orders" element={<Orders />} />
+              <Route path="/orders/:id" element={<OrderDetails />} />
+              <Route path="/order-success/:id" element={<OrderDetails />} />
 
               {/* Default & Catch-all Redirects */}
               <Route path="/" element={<Navigate to={user ? "/home" : "/products"} replace />} />
