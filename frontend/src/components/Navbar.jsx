@@ -1,6 +1,6 @@
 import React from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
-import { ShoppingBag, LogOut, User, LogIn, UserPlus } from "lucide-react";
+import { ShoppingBag, LogOut, User, LogIn, UserPlus, Grid } from "lucide-react";
 import { logoutCustomer } from "../services/api";
 
 const Navbar = ({ user, setUser }) => {
@@ -42,7 +42,7 @@ const Navbar = ({ user, setUser }) => {
       >
         {/* Brand Logo */}
         <Link
-          to={user ? "/home" : "/login"}
+          to="/products"
           style={{
             display: "flex",
             alignItems: "center",
@@ -80,22 +80,45 @@ const Navbar = ({ user, setUser }) => {
         </Link>
 
         {/* Navigation & User Actions */}
-        <nav style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
+        <nav style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
+          {/* Products Catalog Link (Accessible across the entire app) */}
+          <Link
+            id="nav-products-link"
+            to="/products"
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "0.45rem",
+              textDecoration: "none",
+              color: location.pathname.startsWith("/products") ? "#818cf8" : "var(--text-muted)",
+              fontSize: "0.9rem",
+              fontWeight: 600,
+              padding: "0.45rem 0.85rem",
+              borderRadius: "8px",
+              background: location.pathname.startsWith("/products") ? "rgba(99, 102, 241, 0.12)" : "transparent",
+              transition: "all 0.2s",
+            }}
+          >
+            <Grid size={16} />
+            <span>Products</span>
+          </Link>
+
           {user ? (
             <>
               <Link
+                id="nav-profile-link"
                 to="/home"
                 style={{
                   display: "flex",
                   alignItems: "center",
-                  gap: "0.5rem",
+                  gap: "0.45rem",
                   textDecoration: "none",
                   color: location.pathname === "/home" ? "#818cf8" : "var(--text-muted)",
                   fontSize: "0.9rem",
                   fontWeight: 500,
-                  padding: "0.4rem 0.8rem",
+                  padding: "0.45rem 0.85rem",
                   borderRadius: "8px",
-                  background: location.pathname === "/home" ? "rgba(99, 102, 241, 0.1)" : "transparent",
+                  background: location.pathname === "/home" ? "rgba(99, 102, 241, 0.12)" : "transparent",
                   transition: "all 0.2s",
                 }}
               >

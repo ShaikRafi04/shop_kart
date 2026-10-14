@@ -4,6 +4,8 @@ import Navbar from "./components/Navbar";
 import Register from "./pages/Register";
 import Login from "./pages/Login";
 import Home from "./pages/Home";
+import Products from "./pages/Products";
+import ProductDetails from "./pages/ProductDetails";
 import { getMyProfile } from "./services/api";
 
 function App() {
@@ -55,9 +57,13 @@ function App() {
             {/* Protected Home Page */}
             <Route path="/home" element={<Home user={user} setUser={setUser} />} />
 
+            {/* Product Catalog & Discovery Routes (Lab 03) */}
+            <Route path="/products" element={<Products />} />
+            <Route path="/products/:id" element={<ProductDetails />} />
+
             {/* Default & Catch-all Redirects */}
-            <Route path="/" element={<Navigate to={user ? "/home" : "/login"} replace />} />
-            <Route path="*" element={<Navigate to="/login" replace />} />
+            <Route path="/" element={<Navigate to={user ? "/home" : "/products"} replace />} />
+            <Route path="*" element={<Navigate to="/products" replace />} />
           </Routes>
         </main>
       </div>

@@ -9,6 +9,7 @@ const mongoose = require("mongoose");
 const cookieParser = require("cookie-parser");
 
 const customerRoutes = require("./routes/customer.routes");
+const productRoutes = require("./routes/product.routes");
 
 const app = express();
 
@@ -37,6 +38,7 @@ app.use(cookieParser());
 
 // Routes
 app.use("/customers", customerRoutes);
+app.use("/products", productRoutes);
 
 
 // Test route

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import {
   User,
   Mail,
@@ -11,7 +11,8 @@ import {
   ShoppingBag,
   Sparkles,
   Lock,
-  ArrowRight
+  ArrowRight,
+  Grid
 } from "lucide-react";
 import { getMyProfile, changeCustomerPassword } from "../services/api";
 
@@ -152,11 +153,27 @@ const Home = ({ user, setUser }) => {
           </p>
         </div>
 
-        <div style={{ display: "flex", gap: "1rem" }}>
+        <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "1rem" }}>
+          <Link
+            id="home-explore-products-btn"
+            to="/products"
+            className="btn-primary"
+            style={{
+              textDecoration: "none",
+              padding: "0.85rem 1.5rem",
+              borderRadius: "12px",
+              width: "auto",
+            }}
+          >
+            <Grid size={18} />
+            <span>Browse Products</span>
+            <ArrowRight size={16} />
+          </Link>
+
           <div
             style={{
-              padding: "1rem 1.5rem",
-              borderRadius: "14px",
+              padding: "0.75rem 1.25rem",
+              borderRadius: "12px",
               background: "rgba(15, 23, 42, 0.7)",
               border: "1px solid var(--border-subtle)",
               textAlign: "center",

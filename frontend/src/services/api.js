@@ -12,7 +12,7 @@ const api = axios.create({
   },
 });
 
-// Customer Authentication APIs
+// Customer Authentication APIs (Lab 01 & 02)
 export const registerCustomer = async (customerData) => {
   const response = await api.post("/customers/register", customerData);
   return response.data;
@@ -35,6 +35,30 @@ export const logoutCustomer = async () => {
 
 export const changeCustomerPassword = async (passwords) => {
   const response = await api.patch("/customers/change-password", passwords);
+  return response.data;
+};
+
+// Product Catalog & Discovery APIs (Lab 03)
+export const getProducts = async (params = {}) => {
+  // params can contain: { search, category, sort }
+  const cleanParams = {};
+  if (params.search && params.search.trim()) cleanParams.search = params.search.trim();
+  if (params.category && params.category !== "All Categories" && params.category.toLowerCase() !== "all") {
+    cleanParams.category = params.category;
+  }
+  if (params.sort) cleanParams.sort = params.sort;
+
+  const response = await api.get("/products", { params: cleanParams });
+  return response.data;
+};
+
+export const getProductById = async (id) => {
+  const response = await api.get(`/products/${id}`);
+  return response.data;
+};
+
+export const createProduct = async (productData) => {
+  const response = await api.post("/products", productData);
   return response.data;
 };
 
