@@ -1,10 +1,85 @@
-import React from "react";
-import { Link } from "react-router-dom";
-import { Eye, ArrowRight, Tag, Layers } from "lucide-react";
+import React, { useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import { Eye, Tag, Heart, ShoppingCart, AlertCircle, Plus } from "lucide-react";
+import { toggleWishlist } from "../services/api";
+import { useCart } from "../context/CartContext";
 
-const ProductCard = ({ product }) => {
+const ProductCard = ({ product, isInitiallyWishlisted = false, onWishlistChange }) => {
+  const navigate = useNavigate();
+  const { cart, addToCart } = useCart();
+
+  // Wishlist Interaction States
+  const [isWishlisted, setIsWishlisted] = useState(isInitiallyWishlisted);
+  const [savingWishlist, setSavingWishlist] = useState(false);
+
+  // Cart Interaction States
+  const [addingToCart, setAddingToCart] = useState(false);
+  const [cartSuccessNotice, setCartSuccessNotice] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
+
   const isOutOfStock = product.stock <= 0;
   const isLowStock = product.stock > 0 && product.stock <= 5;
+
+  // Check if item is already in global cart
+  const cartItem = cart.find(
+    (i) => i.product?._id === product._id || i.product === product._id
+  );
+  const cartQty = cartItem ? cartItem.quantity : 0;
+  const isAtMaxStock = cartQty >= product.stock;
+
+  // Handle Wishlist Toggle
+  const handleWishlistClick = async (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    if (savingWishlist) return;
+    setSavingWishlist(true);
+    setErrorMessage("");
+
+    try {
+      const res = await toggleWishlist(product._id);
+      if (res && res.success) {
+        setIsWishlisted(res.saved);
+        if (onWishlistChange) onWishlistChange(product._id, res.saved);
+      }
+    } catch (err) {
+      console.error("Wishlist action failed:", err);
+      if (err.response?.status === 401) {
+        navigate("/login");
+      } else {
+        setErrorMessage("Unable to save product.");
+        setTimeout(() => setErrorMessage(""), 3000);
+      }
+    } finally {
+      setSavingWishlist(false);
+    }
+  };
+
+  // Handle Add to Cart
+  const handleAddToCart = async (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    if (addingToCart || isOutOfStock || isAtMaxStock) return;
+    setAddingToCart(true);
+    setErrorMessage("");
+
+    try {
+      await addToCart(product._id);
+      setCartSuccessNotice(true);
+      setTimeout(() => setCartSuccessNotice(false), 2000);
+    } catch (err) {
+      console.error("Add to cart error:", err);
+      if (err.response?.status === 401) {
+        navigate("/login");
+      } else {
+        setErrorMessage(err.response?.data?.message || "Failed to add to cart");
+        setTimeout(() => setErrorMessage(""), 3000);
+      }
+    } finally {
+      setAddingToCart(false);
+    }
+  };
 
   return (
     <div
@@ -73,6 +148,38 @@ const ProductCard = ({ product }) => {
           {product.category}
         </span>
 
+        {/* Wishlist Heart Toggle */}
+        <button
+          onClick={handleWishlistClick}
+          disabled={savingWishlist}
+          style={{
+            position: "absolute",
+            top: "12px",
+            right: "12px",
+            width: "36px",
+            height: "36px",
+            borderRadius: "50%",
+            background: "rgba(15, 23, 42, 0.75)",
+            backdropFilter: "blur(8px)",
+            WebkitBackdropFilter: "blur(8px)",
+            border: "1px solid rgba(255, 255, 255, 0.15)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            cursor: savingWishlist ? "wait" : "pointer",
+            zIndex: 2,
+            transition: "transform 0.2s",
+          }}
+          title={isWishlisted ? "Remove from Wishlist" : "Add to Wishlist"}
+          aria-label={isWishlisted ? "Remove from Wishlist" : "Add to Wishlist"}
+        >
+          <Heart
+            size={18}
+            color={isWishlisted ? "#f43f5e" : "#e2e8f0"}
+            fill={isWishlisted ? "#f43f5e" : "none"}
+          />
+        </button>
+
         {/* Stock Badge */}
         <span
           style={{
@@ -94,9 +201,7 @@ const ProductCard = ({ product }) => {
             zIndex: 2,
           }}
         >
-          {isOutOfStock
-            ? "Out of Stock"
-            : `${product.stock} units left`}
+          {isOutOfStock ? "Out of Stock" : `${product.stock} units left`}
         </span>
       </div>
 
@@ -132,7 +237,7 @@ const ProductCard = ({ product }) => {
               display: "flex",
               alignItems: "baseline",
               gap: "0.5rem",
-              margin: "0.75rem 0 1rem 0",
+              margin: "0.6rem 0 1rem 0",
             }}
           >
             <span
@@ -146,23 +251,90 @@ const ProductCard = ({ product }) => {
               ₹{Number(product.price).toLocaleString("en-IN")}
             </span>
           </div>
+
+          {errorMessage && (
+            <div
+              style={{
+                fontSize: "0.8rem",
+                color: "#fca5a5",
+                marginBottom: "0.75rem",
+                display: "flex",
+                alignItems: "center",
+                gap: "0.3rem",
+              }}
+            >
+              <AlertCircle size={14} />
+              <span>{errorMessage}</span>
+            </div>
+          )}
         </div>
 
-        {/* View Details CTA Button */}
-        <Link
-          to={`/products/${product._id}`}
-          className="btn-primary"
-          style={{
-            textDecoration: "none",
-            fontSize: "0.875rem",
-            padding: "0.65rem 1rem",
-            borderRadius: "10px",
-          }}
-        >
-          <Eye size={16} />
-          <span>View Details</span>
-          <ArrowRight size={15} style={{ marginLeft: "auto" }} />
-        </Link>
+        {/* Actions: [ View Details ] & [ Add to Cart ] */}
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.5rem" }}>
+          <Link
+            to={`/products/${product._id}`}
+            className="btn-outline"
+            style={{
+              textDecoration: "none",
+              fontSize: "0.825rem",
+              padding: "0.6rem 0.5rem",
+              borderRadius: "10px",
+              justifyContent: "center",
+            }}
+          >
+            <Eye size={15} />
+            <span>Details</span>
+          </Link>
+
+          {/* Add to Cart Button (Task 7) */}
+          <button
+            onClick={handleAddToCart}
+            disabled={addingToCart || isOutOfStock || isAtMaxStock}
+            className="btn-primary"
+            style={{
+              fontSize: "0.825rem",
+              padding: "0.6rem 0.5rem",
+              borderRadius: "10px",
+              justifyContent: "center",
+              cursor: addingToCart || isOutOfStock || isAtMaxStock ? "not-allowed" : "pointer",
+              background: isAtMaxStock
+                ? "rgba(100, 116, 139, 0.4)"
+                : cartQty > 0
+                ? "linear-gradient(135deg, #10b981 0%, #059669 100%)"
+                : "linear-gradient(135deg, var(--primary) 0%, var(--primary-hover) 100%)",
+            }}
+            title={
+              isOutOfStock
+                ? "Out of stock"
+                : isAtMaxStock
+                ? "Max stock already in cart"
+                : cartQty > 0
+                ? "Add another unit"
+                : "Add product to cart"
+            }
+          >
+            {addingToCart ? (
+              <>
+                <span className="spinner" style={{ width: "0.85rem", height: "0.85rem" }} />
+                <span>Adding...</span>
+              </>
+            ) : isOutOfStock ? (
+              <span>Out of Stock</span>
+            ) : isAtMaxStock ? (
+              <span>Max in Cart</span>
+            ) : cartQty > 0 ? (
+              <>
+                <Plus size={14} />
+                <span>Add Another ({cartQty})</span>
+              </>
+            ) : (
+              <>
+                <ShoppingCart size={15} />
+                <span>Add to Cart</span>
+              </>
+            )}
+          </button>
+        </div>
       </div>
     </div>
   );

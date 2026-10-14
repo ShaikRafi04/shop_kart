@@ -1,7 +1,7 @@
 const dns = require("dns");
 const dotenv = require("dotenv");
 
-dns.setServers(["8.8.8.8", "1.1.1.1"]);
+dns.setServers(["8.8.8.8", "1.1.1.1", "8.8.4.4", "208.67.222.222"]);
 dotenv.config();
 
 const express = require("express");
@@ -10,6 +10,8 @@ const cookieParser = require("cookie-parser");
 
 const customerRoutes = require("./routes/customer.routes");
 const productRoutes = require("./routes/product.routes");
+const wishlistRoutes = require("./routes/wishlist.routes");
+const cartRoutes = require("./routes/cart.routes");
 
 const app = express();
 
@@ -39,6 +41,8 @@ app.use(cookieParser());
 // Routes
 app.use("/customers", customerRoutes);
 app.use("/products", productRoutes);
+app.use("/wishlist", wishlistRoutes);
+app.use("/cart", cartRoutes);
 
 
 // Test route

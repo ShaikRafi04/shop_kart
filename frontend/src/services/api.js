@@ -62,4 +62,47 @@ export const createProduct = async (productData) => {
   return response.data;
 };
 
+// Wishlist APIs (Lab 04)
+export const addToWishlist = async (productId) => {
+  const response = await api.post(`/wishlist/${productId}`);
+  return response.data;
+};
+
+export const getWishlist = async () => {
+  const response = await api.get("/wishlist");
+  return response.data;
+};
+
+export const removeFromWishlist = async (productId) => {
+  const response = await api.delete(`/wishlist/${productId}`);
+  return response.data;
+};
+
+// Bonus (+10 Marks): Wishlist Toggle API
+export const toggleWishlist = async (productId) => {
+  const response = await api.patch(`/wishlist/${productId}/toggle`);
+  return response.data;
+};
+
+// Shopping Cart APIs (Lab 05)
+export const addToCart = async (productId) => {
+  const response = await api.post(`/cart/${productId}`);
+  return response.data;
+};
+
+export const getCart = async () => {
+  const response = await api.get("/cart");
+  return response.data;
+};
+
+export const updateCartQuantity = async (productId, quantity) => {
+  const response = await api.patch(`/cart/${productId}`, { quantity });
+  return response.data;
+};
+
+export const removeFromCart = async (productId) => {
+  const response = await api.delete(`/cart/${productId}`);
+  return response.data;
+};
+
 export default api;

@@ -1,11 +1,38 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
-import { ShoppingBag, LogOut, User, LogIn, UserPlus, Grid } from "lucide-react";
-import { logoutCustomer } from "../services/api";
+import { ShoppingBag, LogOut, User, LogIn, UserPlus, Grid, Heart, ShoppingCart } from "lucide-react";
+import { logoutCustomer, getWishlist } from "../services/api";
+import { useCart } from "../context/CartContext";
 
 const Navbar = ({ user, setUser }) => {
   const navigate = useNavigate();
   const location = useLocation();
+  const { totalUnits } = useCart();
+  const [wishlistCount, setWishlistCount] = useState(0);
+
+  // Fetch Wishlist count for logged in customer (Lab 04)
+  useEffect(() => {
+    let isMounted = true;
+    const fetchCount = async () => {
+      if (user) {
+        try {
+          const data = await getWishlist();
+          if (isMounted && data && data.success) {
+            setWishlistCount(data.count || 0);
+          }
+        } catch (err) {
+          // If unauthenticated or error, ignore
+        }
+      } else {
+        if (isMounted) setWishlistCount(0);
+      }
+    };
+
+    fetchCount();
+    return () => {
+      isMounted = false;
+    };
+  }, [user, location.pathname]);
 
   const handleLogout = async () => {
     try {
@@ -80,8 +107,8 @@ const Navbar = ({ user, setUser }) => {
         </Link>
 
         {/* Navigation & User Actions */}
-        <nav style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
-          {/* Products Catalog Link (Accessible across the entire app) */}
+        <nav style={{ display: "flex", alignItems: "center", gap: "0.6rem" }}>
+          {/* Products Catalog Link */}
           <Link
             id="nav-products-link"
             to="/products"
@@ -93,7 +120,7 @@ const Navbar = ({ user, setUser }) => {
               color: location.pathname.startsWith("/products") ? "#818cf8" : "var(--text-muted)",
               fontSize: "0.9rem",
               fontWeight: 600,
-              padding: "0.45rem 0.85rem",
+              padding: "0.45rem 0.8rem",
               borderRadius: "8px",
               background: location.pathname.startsWith("/products") ? "rgba(99, 102, 241, 0.12)" : "transparent",
               transition: "all 0.2s",
@@ -103,8 +130,57 @@ const Navbar = ({ user, setUser }) => {
             <span>Products</span>
           </Link>
 
+          {/* Wishlist Link */}
+          <Link
+            id="nav-wishlist-link"
+            to="/wishlist"
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "0.45rem",
+              textDecoration: "none",
+              color: location.pathname === "/wishlist" ? "#f43f5e" : "var(--text-muted)",
+              fontSize: "0.9rem",
+              fontWeight: 600,
+              padding: "0.45rem 0.8rem",
+              borderRadius: "8px",
+              background: location.pathname === "/wishlist" ? "rgba(244, 63, 94, 0.12)" : "transparent",
+              transition: "all 0.2s",
+            }}
+          >
+            <Heart
+              size={16}
+              color={location.pathname === "/wishlist" ? "#f43f5e" : "var(--text-muted)"}
+              fill={location.pathname === "/wishlist" ? "#f43f5e" : "none"}
+            />
+            <span>Wishlist {wishlistCount > 0 ? `(${wishlistCount})` : ""}</span>
+          </Link>
+
+          {/* Shopping Cart Link (Lab 05: Dynamic Cart Count) */}
+          <Link
+            id="nav-cart-link"
+            to="/cart"
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "0.45rem",
+              textDecoration: "none",
+              color: location.pathname === "/cart" ? "#818cf8" : "var(--text-muted)",
+              fontSize: "0.9rem",
+              fontWeight: 600,
+              padding: "0.45rem 0.8rem",
+              borderRadius: "8px",
+              background: location.pathname === "/cart" ? "rgba(99, 102, 241, 0.15)" : "transparent",
+              transition: "all 0.2s",
+            }}
+          >
+            <ShoppingCart size={16} color={location.pathname === "/cart" ? "#818cf8" : "var(--text-muted)"} />
+            <span>Cart {totalUnits > 0 ? `(${totalUnits})` : ""}</span>
+          </Link>
+
           {user ? (
             <>
+              {/* Home / Profile Link */}
               <Link
                 id="nav-profile-link"
                 to="/home"
@@ -116,7 +192,7 @@ const Navbar = ({ user, setUser }) => {
                   color: location.pathname === "/home" ? "#818cf8" : "var(--text-muted)",
                   fontSize: "0.9rem",
                   fontWeight: 500,
-                  padding: "0.45rem 0.85rem",
+                  padding: "0.45rem 0.8rem",
                   borderRadius: "8px",
                   background: location.pathname === "/home" ? "rgba(99, 102, 241, 0.12)" : "transparent",
                   transition: "all 0.2s",
@@ -126,6 +202,7 @@ const Navbar = ({ user, setUser }) => {
                 <span>{user.fullName || "My Profile"}</span>
               </Link>
 
+              {/* Logout Button */}
               <button
                 id="logout-btn"
                 onClick={handleLogout}

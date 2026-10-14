@@ -13,60 +13,45 @@ import {
   AlertCircle
 } from "lucide-react";
 import { getProductById } from "../services/api";
+import { useCart } from "../context/CartContext";
 
 const ProductDetails = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { cart, addToCart } = useCart();
 
   const [product, setProduct] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [adding, setAdding] = useState(false);
   const [addedNotice, setAddedNotice] = useState(false);
+  const [cartError, setCartError] = useState("");
 
-  useEffect(() => {
-    let isMounted = true;
+  const cartItem = cart.find(
+    (i) => i.product?._id === id || i.product === id
+  );
+  const cartQty = cartItem ? cartItem.quantity : 0;
+  const isAtMaxStock = product ? cartQty >= product.stock : false;
 
-    const fetchDetails = async () => {
-      setLoading(true);
-      setError("");
+  const handleAddToCart = async () => {
+    if (!product || adding || product.stock <= 0 || isAtMaxStock) return;
+    setAdding(true);
+    setCartError("");
 
-      try {
-        const data = await getProductById(id);
-        if (isMounted) {
-          if (data && data.success && data.product) {
-            setProduct(data.product);
-          } else {
-            setError("Product not found.");
-          }
-        }
-      } catch (err) {
-        console.error("Error fetching product details:", err);
-        if (isMounted) {
-          const status = err.response?.status;
-          if (status === 400) {
-            setError("Invalid product ID.");
-          } else if (status === 404) {
-            setError("Product not found.");
-          } else {
-            setError("Something went wrong while loading the product.");
-          }
-        }
-      } finally {
-        if (isMounted) setLoading(false);
+    try {
+      await addToCart(product._id);
+      setAddedNotice(true);
+      setTimeout(() => setAddedNotice(false), 2500);
+    } catch (err) {
+      if (err.response?.status === 401) {
+        navigate("/login");
+      } else {
+        setCartError(err.response?.data?.message || "Failed to add to cart");
+        setTimeout(() => setCartError(""), 3500);
       }
-    };
-
-    fetchDetails();
-
-    return () => {
-      isMounted = false;
-    };
-  }, [id]);
-
-  const handleAddToCart = () => {
-    // UI feedback only for this lab (cart backend comes in Lab 04)
-    setAddedNotice(true);
-    setTimeout(() => setAddedNotice(false), 2500);
+    } finally {
+      setAdding(false);
+    }
   };
 
   // 1. Loading State
@@ -293,7 +278,14 @@ const ProductDetails = () => {
             {addedNotice && (
               <div className="alert alert-success animate-fade-in" style={{ marginBottom: "1rem" }}>
                 <CheckCircle size={18} />
-                <span>Added to cart! (Cart backend service will be introduced in Lab 04)</span>
+                <span>Product added to cart! ({cartQty} in cart)</span>
+              </div>
+            )}
+
+            {cartError && (
+              <div className="alert alert-error animate-fade-in" style={{ marginBottom: "1rem" }}>
+                <AlertCircle size={18} />
+                <span>{cartError}</span>
               </div>
             )}
 
@@ -302,17 +294,40 @@ const ProductDetails = () => {
               id="add-to-cart-btn"
               onClick={handleAddToCart}
               className="btn-primary"
-              disabled={isOutOfStock}
+              disabled={isOutOfStock || isAtMaxStock || adding}
               style={{
                 fontSize: "1.05rem",
                 padding: "1rem 2rem",
                 borderRadius: "12px",
                 width: "100%",
                 marginBottom: "1.5rem",
+                background: isAtMaxStock
+                  ? "rgba(100, 116, 139, 0.4)"
+                  : cartQty > 0
+                  ? "linear-gradient(135deg, #10b981 0%, #059669 100%)"
+                  : "linear-gradient(135deg, var(--primary) 0%, var(--primary-hover) 100%)",
               }}
             >
-              <ShoppingCart size={20} />
-              <span>{isOutOfStock ? "Out of Stock" : "Add to Cart"}</span>
+              {adding ? (
+                <>
+                  <span className="spinner" style={{ width: "1.1rem", height: "1.1rem" }} />
+                  <span>Adding to Cart...</span>
+                </>
+              ) : isOutOfStock ? (
+                <span>Out of Stock</span>
+              ) : isAtMaxStock ? (
+                <span>Maximum Stock in Cart ({cartQty})</span>
+              ) : cartQty > 0 ? (
+                <>
+                  <ShoppingCart size={20} />
+                  <span>Add Another to Cart ({cartQty} in Cart)</span>
+                </>
+              ) : (
+                <>
+                  <ShoppingCart size={20} />
+                  <span>Add to Cart</span>
+                </>
+              )}
             </button>
 
             {/* Trust Badges */}

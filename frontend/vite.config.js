@@ -10,12 +10,42 @@ export default defineConfig({
       '/customers': {
         target: 'http://localhost:5000',
         changeOrigin: true,
-        secure: false
+        secure: false,
+        bypass: (req) => {
+          if (req.headers.accept && req.headers.accept.includes('text/html')) {
+            return '/index.html';
+          }
+        }
       },
       '/products': {
         target: 'http://localhost:5000',
         changeOrigin: true,
-        secure: false
+        secure: false,
+        bypass: (req) => {
+          if (req.headers.accept && req.headers.accept.includes('text/html')) {
+            return '/index.html';
+          }
+        }
+      },
+      '/wishlist': {
+        target: 'http://localhost:5000',
+        changeOrigin: true,
+        secure: false,
+        bypass: (req) => {
+          if (req.headers.accept && req.headers.accept.includes('text/html')) {
+            return '/index.html';
+          }
+        }
+      },
+      '/cart': {
+        target: 'http://localhost:5000',
+        changeOrigin: true,
+        secure: false,
+        bypass: (req) => {
+          if (req.headers.accept && req.headers.accept.includes('text/html')) {
+            return '/index.html';
+          }
+        }
       }
     }
   }
