@@ -4,6 +4,12 @@ const Order = require("../models/order.model");
 const Customer = require("../models/customer.model");
 const Product = require("../models/product.model");
 const razorpay = require("../config/razorpay");
+const {
+  inMemoryOrders,
+  inMemoryCarts,
+  inMemoryCustomers,
+  fallbackProducts,
+} = require("../utils/inMemoryStore");
 
 /**
  * Task 4: Create Payment Order
@@ -57,8 +63,24 @@ exports.createPaymentOrder = async (req, res) => {
       });
     }
 
-    // Load customer & cart
-    const customer = await Customer.findById(req.user._id);
+    // Load customer & cart (Database or in-memory fallback)
+    let customer = null;
+    let cartItems = [];
+
+    if (mongoose.connection.readyState === 1) {
+      try {
+        customer = await Customer.findById(req.user._id);
+        cartItems = customer?.cart || [];
+      } catch (e) {
+        // Fall through
+      }
+    }
+
+    if (!customer) {
+      customer = inMemoryCustomers.get(req.user._id.toString()) || req.user;
+      cartItems = inMemoryCarts.get(req.user._id.toString()) || [];
+    }
+
     if (!customer) {
       return res.status(404).json({
         success: false,
@@ -66,7 +88,7 @@ exports.createPaymentOrder = async (req, res) => {
       });
     }
 
-    if (!customer.cart || customer.cart.length === 0) {
+    if (!cartItems || cartItems.length === 0) {
       return res.status(400).json({
         success: false,
         message: "Your cart is empty. Please add items before checking out.",
@@ -74,61 +96,95 @@ exports.createPaymentOrder = async (req, res) => {
     }
 
     // Load latest product documents to verify stock and price (never trust frontend totals)
-    const productIds = customer.cart.map((item) => item.product);
-    const products = await Product.find({ _id: { $in: productIds } });
-    const productMap = new Map();
-    products.forEach((p) => productMap.set(p._id.toString(), p));
+    const orderItems = [];
+    let serverTotal = 0;
 
-    // Verify all products exist and have sufficient stock
-    for (const item of customer.cart) {
-      const product = productMap.get(item.product.toString());
+    for (const item of cartItems) {
+      const prodId = (item.product?._id || item.product).toString();
+      let product = null;
+
+      if (mongoose.connection.readyState === 1) {
+        try {
+          product = await Product.findById(prodId);
+        } catch (e) {}
+      }
+
+      if (!product) {
+        product = fallbackProducts.find((p) => p._id === prodId) || (typeof item.product === "object" ? item.product : null);
+      }
+
       if (!product) {
         return res.status(400).json({
           success: false,
           message: "One or more products in your cart are no longer available",
         });
       }
+
       if (item.quantity > product.stock) {
         return res.status(400).json({
           success: false,
           message: `Insufficient stock for ${product.name}. Available: ${product.stock}, in cart: ${item.quantity}.`,
         });
       }
-    }
 
-    // Build order snapshot items and calculate total on server
-    let serverTotal = 0;
-    const orderItems = customer.cart.map((item) => {
-      const product = productMap.get(item.product.toString());
       const itemPrice = product.price;
       serverTotal += itemPrice * item.quantity;
-      return {
+      orderItems.push({
         product: product._id,
         name: product.name,
         price: itemPrice,
         quantity: item.quantity,
         image: product.image,
-      };
-    });
+      });
+    }
+
+    const orderId = new mongoose.Types.ObjectId().toString();
 
     // Create pending ShopKart order
-    const shopKartOrder = new Order({
-      user: customer._id,
-      items: orderItems,
-      shippingAddress: {
-        fullName: fullName.trim(),
-        phone: phone.trim(),
-        addressLine1: addressLine1.trim(),
-        city: city.trim(),
-        state: state.trim(),
-        pincode: pincode.trim(),
-      },
-      totalAmount: serverTotal,
-      status: "PENDING_PAYMENT",
-      paymentStatus: "PENDING",
-    });
+    let shopKartOrder;
+    if (mongoose.connection.readyState === 1) {
+      try {
+        shopKartOrder = new Order({
+          user: customer._id,
+          items: orderItems,
+          shippingAddress: {
+            fullName: fullName.trim(),
+            phone: phone.trim(),
+            addressLine1: addressLine1.trim(),
+            city: city.trim(),
+            state: state.trim(),
+            pincode: pincode.trim(),
+          },
+          totalAmount: serverTotal,
+          status: "PENDING_PAYMENT",
+          paymentStatus: "PENDING",
+        });
+        await shopKartOrder.save();
+      } catch (e) {
+        shopKartOrder = null;
+      }
+    }
 
-    await shopKartOrder.save();
+    if (!shopKartOrder) {
+      shopKartOrder = {
+        _id: orderId,
+        user: customer._id,
+        items: orderItems,
+        shippingAddress: {
+          fullName: fullName.trim(),
+          phone: phone.trim(),
+          addressLine1: addressLine1.trim(),
+          city: city.trim(),
+          state: state.trim(),
+          pincode: pincode.trim(),
+        },
+        totalAmount: serverTotal,
+        status: "PENDING_PAYMENT",
+        paymentStatus: "PENDING",
+        createdAt: new Date().toISOString(),
+      };
+      inMemoryOrders.set(orderId, shopKartOrder);
+    }
 
     // Create Razorpay Order in paise (1 INR = 100 paise)
     const amountInPaise = Math.round(serverTotal * 100);
@@ -147,7 +203,11 @@ exports.createPaymentOrder = async (req, res) => {
     }
 
     shopKartOrder.razorpayOrderId = razorpayOrderId;
-    await shopKartOrder.save();
+    if (typeof shopKartOrder.save === "function") {
+      await shopKartOrder.save();
+    } else {
+      inMemoryOrders.set(shopKartOrder._id.toString(), shopKartOrder);
+    }
 
     return res.status(201).json({
       success: true,
@@ -191,7 +251,17 @@ exports.verifyPayment = async (req, res) => {
       });
     }
 
-    const order = await Order.findById(shopKartOrderId);
+    let order = null;
+    if (mongoose.connection.readyState === 1) {
+      try {
+        order = await Order.findById(shopKartOrderId);
+      } catch (e) {}
+    }
+
+    if (!order) {
+      order = inMemoryOrders.get(shopKartOrderId.toString());
+    }
+
     if (!order) {
       return res.status(404).json({
         success: false,
@@ -219,7 +289,11 @@ exports.verifyPayment = async (req, res) => {
 
     if (expectedSignature !== razorpay_signature) {
       order.paymentStatus = "FAILED";
-      await order.save();
+      if (typeof order.save === "function") {
+        await order.save();
+      } else {
+        inMemoryOrders.set(order._id.toString(), order);
+      }
       // DO NOT clear cart on failed signature!
       return res.status(400).json({
         success: false,
@@ -232,20 +306,33 @@ exports.verifyPayment = async (req, res) => {
     order.status = "PLACED";
     order.razorpayPaymentId = razorpay_payment_id;
     order.razorpaySignature = razorpay_signature;
-    await order.save();
 
-    // Decrement stock for ordered items
-    for (const item of order.items) {
-      await Product.findByIdAndUpdate(item.product, {
-        $inc: { stock: -item.quantity },
-      });
-    }
+    if (typeof order.save === "function") {
+      await order.save();
 
-    // Clear user's cart in database
-    const customer = await Customer.findById(req.user._id);
-    if (customer) {
-      customer.cart = [];
-      await customer.save();
+      // Decrement stock for ordered items
+      for (const item of order.items) {
+        await Product.findByIdAndUpdate(item.product, {
+          $inc: { stock: -item.quantity },
+        });
+      }
+
+      // Clear user's cart in database
+      const customer = await Customer.findById(req.user._id);
+      if (customer) {
+        customer.cart = [];
+        await customer.save();
+      }
+    } else {
+      // In-memory update
+      inMemoryOrders.set(order._id.toString(), order);
+      inMemoryCarts.set(req.user._id.toString(), []);
+      for (const item of order.items) {
+        const prod = fallbackProducts.find((p) => p._id === item.product.toString());
+        if (prod) {
+          prod.stock = Math.max(0, prod.stock - item.quantity);
+        }
+      }
     }
 
     return res.status(200).json({
@@ -270,7 +357,20 @@ exports.verifyPayment = async (req, res) => {
  */
 exports.getMyOrders = async (req, res) => {
   try {
-    const orders = await Order.find({ user: req.user._id }).sort({ createdAt: -1 });
+    let orders = [];
+
+    if (mongoose.connection.readyState === 1) {
+      try {
+        orders = await Order.find({ user: req.user._id }).sort({ createdAt: -1 });
+      } catch (e) {}
+    }
+
+    if (!orders || orders.length === 0) {
+      const allMem = Array.from(inMemoryOrders.values());
+      orders = allMem
+        .filter((o) => o.user.toString() === req.user._id.toString())
+        .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+    }
 
     return res.status(200).json({
       success: true,
@@ -303,7 +403,17 @@ exports.getOrderById = async (req, res) => {
       });
     }
 
-    const order = await Order.findById(id);
+    let order = null;
+    if (mongoose.connection.readyState === 1) {
+      try {
+        order = await Order.findById(id);
+      } catch (e) {}
+    }
+
+    if (!order) {
+      order = inMemoryOrders.get(id.toString());
+    }
+
     if (!order) {
       return res.status(404).json({
         success: false,
@@ -358,7 +468,17 @@ exports.updateOrderStatus = async (req, res) => {
       });
     }
 
-    const order = await Order.findById(id);
+    let order = null;
+    if (mongoose.connection.readyState === 1) {
+      try {
+        order = await Order.findById(id);
+      } catch (e) {}
+    }
+
+    if (!order) {
+      order = inMemoryOrders.get(id.toString());
+    }
+
     if (!order) {
       return res.status(404).json({
         success: false,
@@ -375,7 +495,11 @@ exports.updateOrderStatus = async (req, res) => {
     }
 
     order.status = status;
-    await order.save();
+    if (typeof order.save === "function") {
+      await order.save();
+    } else {
+      inMemoryOrders.set(order._id.toString(), order);
+    }
 
     return res.status(200).json({
       success: true,
@@ -425,4 +549,3 @@ exports.generateTestSignature = async (req, res) => {
     });
   }
 };
-

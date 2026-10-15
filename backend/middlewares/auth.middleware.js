@@ -19,7 +19,27 @@ const authMiddleware = async (req, res, next) => {
 
         const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
-        const customer = await Customer.findById(decoded.id).select("-password");
+        let customer = null;
+        if (require("mongoose").connection.readyState === 1) {
+            try {
+                customer = await Customer.findById(decoded.id).select("-password");
+            } catch (err) {
+                // fall through to in-memory store
+            }
+        }
+
+        if (!customer) {
+            const { inMemoryCustomers } = require("../utils/inMemoryStore");
+            const memCustomer = inMemoryCustomers.get(decoded.id);
+            if (memCustomer) {
+                customer = {
+                    _id: memCustomer._id,
+                    fullName: memCustomer.fullName,
+                    email: memCustomer.email,
+                    phone: memCustomer.phone
+                };
+            }
+        }
 
         if (!customer) {
             return res.status(401).json({

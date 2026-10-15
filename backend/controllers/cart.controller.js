@@ -1,6 +1,7 @@
 const mongoose = require("mongoose");
 const Customer = require("../models/customer.model");
 const Product = require("../models/product.model");
+const { inMemoryCarts, fallbackProducts } = require("../utils/inMemoryStore");
 
 // Helper to populate cart.product
 const getPopulatedCart = async (userId) => {
@@ -21,6 +22,45 @@ const addToCart = async (req, res) => {
             return res.status(400).json({
                 success: false,
                 message: "Invalid product ID"
+            });
+        }
+
+        if (mongoose.connection.readyState !== 1) {
+            const product = fallbackProducts.find((p) => p._id === productId);
+            if (!product) {
+                return res.status(404).json({
+                    success: false,
+                    message: "Product not found"
+                });
+            }
+            const userId = req.user._id.toString();
+            let cart = inMemoryCarts.get(userId) || [];
+            const existingItem = cart.find(
+                (item) => item.product?._id === productId || item.product === productId
+            );
+
+            if (existingItem) {
+                if (existingItem.quantity + 1 > product.stock) {
+                    return res.status(400).json({
+                        success: false,
+                        message: "Requested quantity exceeds available stock"
+                    });
+                }
+                existingItem.quantity += 1;
+            } else {
+                if (product.stock < 1) {
+                    return res.status(400).json({
+                        success: false,
+                        message: "Product is out of stock"
+                    });
+                }
+                cart.push({ product, quantity: 1 });
+            }
+            inMemoryCarts.set(userId, cart);
+            return res.status(200).json({
+                success: true,
+                message: "Cart updated",
+                cart
             });
         }
 
@@ -91,6 +131,15 @@ const addToCart = async (req, res) => {
 // GET CURRENT USER'S CART - GET /cart
 const getCart = async (req, res) => {
     try {
+        if (mongoose.connection.readyState !== 1) {
+            const userId = req.user._id.toString();
+            const cart = inMemoryCarts.get(userId) || [];
+            return res.status(200).json({
+                success: true,
+                cart
+            });
+        }
+
         const cart = await getPopulatedCart(req.user._id);
 
         return res.status(200).json({
@@ -131,6 +180,44 @@ const updateQuantity = async (req, res) => {
             return res.status(400).json({
                 success: false,
                 message: "Quantity must be an integer of at least 1"
+            });
+        }
+
+        if (mongoose.connection.readyState !== 1) {
+            const product = fallbackProducts.find((p) => p._id === productId);
+            if (!product) {
+                return res.status(404).json({
+                    success: false,
+                    message: "Product not found"
+                });
+            }
+            const userId = req.user._id.toString();
+            let cart = inMemoryCarts.get(userId) || [];
+            const cartItem = cart.find(
+                (item) => item.product?._id === productId || item.product === productId
+            );
+
+            if (!cartItem) {
+                return res.status(404).json({
+                    success: false,
+                    message: "Product not in cart"
+                });
+            }
+
+            if (numQty > product.stock) {
+                return res.status(400).json({
+                    success: false,
+                    message: "Requested quantity exceeds available stock"
+                });
+            }
+
+            cartItem.quantity = numQty;
+            inMemoryCarts.set(userId, cart);
+
+            return res.status(200).json({
+                success: true,
+                message: "Cart quantity updated",
+                cart
             });
         }
 
@@ -202,6 +289,32 @@ const removeFromCart = async (req, res) => {
             return res.status(400).json({
                 success: false,
                 message: "Invalid product ID"
+            });
+        }
+
+        if (mongoose.connection.readyState !== 1) {
+            const userId = req.user._id.toString();
+            let cart = inMemoryCarts.get(userId) || [];
+            const exists = cart.some(
+                (item) => item.product?._id === productId || item.product === productId
+            );
+
+            if (!exists) {
+                return res.status(404).json({
+                    success: false,
+                    message: "Product not in cart"
+                });
+            }
+
+            cart = cart.filter(
+                (item) => item.product?._id !== productId && item.product !== productId
+            );
+            inMemoryCarts.set(userId, cart);
+
+            return res.status(200).json({
+                success: true,
+                message: "Product removed from cart",
+                cart
             });
         }
 

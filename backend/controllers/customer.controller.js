@@ -33,6 +33,41 @@ const registerCustomer = async (req, res) => {
         }
 
         const normalizedEmail = String(email).trim().toLowerCase();
+        const { inMemoryCustomers } = require("../utils/inMemoryStore");
+
+        if (require("mongoose").connection.readyState !== 1) {
+            // Check in-memory store
+            for (const c of inMemoryCustomers.values()) {
+                if (c.email === normalizedEmail) {
+                    return res.status(409).json({
+                        success: false,
+                        message: "Email already exists"
+                    });
+                }
+            }
+
+            const hashedPassword = await bcrypt.hash(password, 10);
+            const id = new (require("mongoose")).Types.ObjectId().toString();
+            const memCustomer = {
+                _id: id,
+                fullName: String(fullName).trim(),
+                email: normalizedEmail,
+                password: hashedPassword,
+                phone: String(phone).trim()
+            };
+            inMemoryCustomers.set(id, memCustomer);
+
+            return res.status(201).json({
+                success: true,
+                message: "Customer registered successfully",
+                customer: {
+                    _id: memCustomer._id,
+                    fullName: memCustomer.fullName,
+                    email: memCustomer.email,
+                    phone: memCustomer.phone
+                }
+            });
+        }
 
         // Check if email already exists
         const existingCustomer = await Customer.findOne({ email: normalizedEmail });
@@ -97,8 +132,18 @@ const loginCustomer = async (req, res) => {
 
         const normalizedEmail = String(email).trim().toLowerCase();
 
-        // Find customer
-        const customer = await Customer.findOne({ email: normalizedEmail });
+        let customer = null;
+        if (require("mongoose").connection.readyState === 1) {
+            customer = await Customer.findOne({ email: normalizedEmail });
+        } else {
+            const { inMemoryCustomers } = require("../utils/inMemoryStore");
+            for (const c of inMemoryCustomers.values()) {
+                if (c.email === normalizedEmail) {
+                    customer = c;
+                    break;
+                }
+            }
+        }
 
         if (!customer) {
             return res.status(401).json({

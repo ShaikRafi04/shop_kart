@@ -1,3 +1,4 @@
+require("dotenv").config();
 const crypto = require("crypto");
 
 async function runOrderTests() {
@@ -149,7 +150,7 @@ async function runOrderTests() {
   if (cartAfterFail.data?.cart?.length !== 1) throw new Error("Cart should NOT be cleared after failed payment!");
 
   // Test 6: Verify payment with VALID HMAC SHA-256 signature
-  const testSecret = "shopkart_test_secret_1234";
+  const testSecret = process.env.RAZORPAY_KEY_SECRET || "shopkart_test_secret_1234";
   const testPaymentId = "pay_test_" + Date.now();
   const validSignature = crypto
     .createHmac("sha256", testSecret)

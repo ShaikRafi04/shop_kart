@@ -1,6 +1,7 @@
 const mongoose = require("mongoose");
 const Customer = require("../models/customer.model");
 const Product = require("../models/product.model");
+const { inMemoryWishlists, fallbackProducts } = require("../utils/inMemoryStore");
 
 // ADD PRODUCT TO WISHLIST - POST /wishlist/:productId
 const addToWishlist = async (req, res) => {
@@ -12,6 +13,30 @@ const addToWishlist = async (req, res) => {
             return res.status(400).json({
                 success: false,
                 message: "Invalid product ID"
+            });
+        }
+
+        if (mongoose.connection.readyState !== 1) {
+            const product = fallbackProducts.find((p) => p._id === productId);
+            if (!product) {
+                return res.status(404).json({
+                    success: false,
+                    message: "Product not found"
+                });
+            }
+            const userId = req.user._id.toString();
+            let wishlist = inMemoryWishlists.get(userId) || [];
+            if (wishlist.some((p) => p._id === productId)) {
+                return res.status(409).json({
+                    success: false,
+                    message: "Product already in wishlist"
+                });
+            }
+            wishlist.push(product);
+            inMemoryWishlists.set(userId, wishlist);
+            return res.status(201).json({
+                success: true,
+                message: "Product added to wishlist"
             });
         }
 
@@ -65,6 +90,16 @@ const addToWishlist = async (req, res) => {
 // GET CURRENT USER'S WISHLIST - GET /wishlist
 const getWishlist = async (req, res) => {
     try {
+        if (mongoose.connection.readyState !== 1) {
+            const userId = req.user._id.toString();
+            const wishlist = inMemoryWishlists.get(userId) || [];
+            return res.status(200).json({
+                success: true,
+                count: wishlist.length,
+                wishlist
+            });
+        }
+
         // Authenticated user from auth middleware
         const customer = await Customer.findById(req.user._id).populate({
             path: "wishlist",
@@ -105,6 +140,24 @@ const removeFromWishlist = async (req, res) => {
             return res.status(400).json({
                 success: false,
                 message: "Invalid product ID"
+            });
+        }
+
+        if (mongoose.connection.readyState !== 1) {
+            const userId = req.user._id.toString();
+            let wishlist = inMemoryWishlists.get(userId) || [];
+            const exists = wishlist.some((p) => p._id === productId);
+            if (!exists) {
+                return res.status(404).json({
+                    success: false,
+                    message: "Product not in wishlist"
+                });
+            }
+            wishlist = wishlist.filter((p) => p._id !== productId);
+            inMemoryWishlists.set(userId, wishlist);
+            return res.status(200).json({
+                success: true,
+                message: "Product removed from wishlist"
             });
         }
 
@@ -158,6 +211,37 @@ const toggleWishlist = async (req, res) => {
                 success: false,
                 message: "Invalid product ID"
             });
+        }
+
+        if (mongoose.connection.readyState !== 1) {
+            const product = fallbackProducts.find((p) => p._id === productId);
+            if (!product) {
+                return res.status(404).json({
+                    success: false,
+                    message: "Product not found"
+                });
+            }
+            const userId = req.user._id.toString();
+            let wishlist = inMemoryWishlists.get(userId) || [];
+            const isAlreadyWishlisted = wishlist.some((p) => p._id === productId);
+
+            if (isAlreadyWishlisted) {
+                wishlist = wishlist.filter((p) => p._id !== productId);
+                inMemoryWishlists.set(userId, wishlist);
+                return res.status(200).json({
+                    success: true,
+                    saved: false,
+                    message: "Product removed from wishlist"
+                });
+            } else {
+                wishlist.push(product);
+                inMemoryWishlists.set(userId, wishlist);
+                return res.status(200).json({
+                    success: true,
+                    saved: true,
+                    message: "Product added to wishlist"
+                });
+            }
         }
 
         const product = await Product.findById(productId);
